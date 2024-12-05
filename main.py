@@ -14,57 +14,111 @@ from langchain.utilities import GoogleSerperAPIWrapper
 from langchain.utilities import OpenWeatherMapAPIWrapper
 from langchain_groq import ChatGroq
 
+
+import random
 import os
+import requests
+import asyncio
 
-from APIs import *
+st.title("Bird Watching Assistant")
 
+st.text('''Funcionalitys:
 
-
-st.title("Smart Day Planner")
+- Ask questions about birds
+- Get current weather in a location to know if is possible to birdwatch
+- Get a random bird song
+- Get a specific bird song''')
 
 
 # Set Tools
-# Use set if you using windows or export if you are using linux
-# set SERPER_API_KEY
 SERPER_API_KEY = os.getenv("SERPER_API_KEY") 
 OPENWEATHERMAP_API_KEY = os.getenv("OPENWEATHERMAP_API_KEY")
 
-
 search = GoogleSerperAPIWrapper(serper_api_key=SERPER_API_KEY)
 weather = OpenWeatherMapAPIWrapper(openweathermap_api_key=OPENWEATHERMAP_API_KEY)
-canto_aleatorio = random_canto()
-canto_especifico = pesquisa_canto(nome_ave_ingles="cockatiel")
 
+
+async def random_canto(_):
+    url = "https://xeno-canto.org/api/2/recordings?query=cnt:brazil"
+
+    response = requests.get(url)
+
+    json = response.json()
+
+    rand = random.randint(0, len(json['recordings'])-1)
+
+    # consigo o file a partir do ID
+    file_url = json['recordings'][rand]['file']
+    name_url = json['recordings'][rand]['en']
+
+    # baixo o arquivo
+    response = requests.get(file_url, stream=True)
+
+    # salvo o arquivo em um arquivo local
+    with open('.\cantos\canto.mp3', 'wb') as f:
+        for chunk in response.iter_content(chunk_size=1024):
+            f.write(chunk)
+    print("Canto da Ave: "+name_url)
+    print("Arquivo baixado com sucesso!")
+
+    st.audio('.\cantos\canto.mp3')
+
+async def pesquisa_canto(nome_ave):
+    url = f"https://xeno-canto.org/api/2/recordings?query={nome_ave}"
+
+    response = requests.get(url)
+
+    json = response.json()
+
+    rand = random.randint(0, len(json['recordings'])-1)
+
+    # consigo o file a partir do ID
+    file_url = json['recordings'][rand]['file']
+
+    # baixo o arquivo
+    response = requests.get(file_url, stream=True)
+
+    # salvo o arquivo em um arquivo local
+    with open('.\cantos\canto_especifico.mp3', 'wb') as f:
+        for chunk in response.iter_content(chunk_size=1024):
+            f.write(chunk)
+
+    print("Arquivo baixado com sucesso!")
+
+    # toca o arquivo mp3 com streamlit
+
+    st.subheader("Canto da Ave: "+nome_ave)
+    st.audio('.\cantos\canto_especifico.mp3')
 
 tools = [
     Tool(
         name="Search",
         func=search.run,
-        description="Useful for when you need to get current, up to date answers.",
+        description="Useful for when you need to get especific information about a topic like a bird curiosity or a atuality. Input should be a search query.",
     ),
     Tool(
         name="Weather",
         func=weather.run,
-        description="Useful for when you need to get the weather.",
+        description="Useful for when you need to get the current weather in a location.",
     ),
     Tool(
-        name="Canto Aleatorio",
-        func=canto_aleatorio,
+        name="Canto Aleatório",
+        func=lambda input: asyncio.run(random_canto(input)),
         description="Useful for when you need to get a random bird song.",
     ),
     Tool(
-        name="Canto Especifico",
-        func=canto_especifico,
-        description="Useful for when you need to get a specific bird song.",
-    ),
+        name="Canto Específico",
+        func=lambda input: asyncio.run(pesquisa_canto(input)),
+        description="Useful for when you need to get a specific bird song. Like cockatiel, lovebird, conures, etc.",
+    )
+
 ]
 
 # Set Chat Conversation
 
-prefix = """ You are a friendly modern day planner.
-You can help users to find activities in a given city based
-on their preferences and the weather.
-You have access to the two tools:
+prefix = """ You are a friendly bird watching assistant.
+You can help users to listen bird songs based on their preferences.
+You have access to the following tools:"
 """
 
 suffix = """
@@ -108,7 +162,7 @@ agent = ConversationalAgent(
     memory=memory,
     verbose=True,
     max_interactions=3,
-    tools=tools
+    tools=tools,
 )
 
 agent_executor = AgentExecutor.from_agent_and_tools(agent=agent,
@@ -116,7 +170,8 @@ agent_executor = AgentExecutor.from_agent_and_tools(agent=agent,
                                                     memory=memory,
                                                     verbose=True)
 
-query = st.text_input("O que você quer fazer hoje?", placeholder="Digite aqui...")
+#query = st.text_input("O que você quer fazer hoje?", placeholder="Digite aqui...")
+query = st.text_input("What you want to know about birds?")
 
 if query:
     with st.spinner("Estou pensando..."):

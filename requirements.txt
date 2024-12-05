@@ -4,3 +4,5 @@ langchain_openai
 langchain_community
 pyowm
 langchain_groq
+python-steam-api
+python-decouple
