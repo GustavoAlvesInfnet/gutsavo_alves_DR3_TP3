@@ -87,7 +87,7 @@ async def pesquisa_canto(nome_ave):
 
     # toca o arquivo mp3 com streamlit
 
-    st.subheader("Canto da Ave: "+nome_ave)
+    #st.subheader("Canto da Ave: "+nome_ave)
     st.audio('.\cantos\canto_especifico.mp3')
 
 tools = [
